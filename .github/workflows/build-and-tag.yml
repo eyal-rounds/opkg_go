@@ -1,0 +1,54 @@
+name: Build and Tag
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build opkg binary
+        env:
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          go build -o dist/opkg ./cmd/opkg
+
+      - name: Upload opkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opkg
+          path: dist/opkg
+
+      - name: Determine tag name
+        id: tag
+        run: echo "tag_name=build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        env:
+          TAG_NAME: ${{ steps.tag.outputs.tag_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists."
+          else
+            git tag "$TAG_NAME"
+            git push origin "$TAG_NAME"
+          fi

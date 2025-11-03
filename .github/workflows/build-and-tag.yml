@@ -22,22 +22,32 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build opkg binary
+      - name: Determine tag name
+        id: tag
+        run: |
+          git fetch --tags
+          latest_tag=$(git tag --list '[0-9]*' | grep -E '^[0-9]+$' | sort -n | tail -1)
+          if [ -z "$latest_tag" ]; then
+            next_tag=1
+          else
+            next_tag=$((latest_tag + 1))
+          fi
+          echo "tag_name=$next_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Build opkg binaries
         env:
           CGO_ENABLED: 0
         run: |
           mkdir -p dist
-          go build -o dist/opkg ./cmd/opkg
+          GOOS=linux GOARCH=amd64 go build -o dist/opkg-linux-x86_64 ./cmd/opkg
+          GOOS=linux GOARCH=arm GOARM=7 go build -o dist/opkg-linux-arm32 ./cmd/opkg
+          GOOS=linux GOARCH=arm64 go build -o dist/opkg-linux-arm64 ./cmd/opkg
 
       - name: Upload opkg artifact
         uses: actions/upload-artifact@v4
         with:
           name: opkg
-          path: dist/opkg
-
-      - name: Determine tag name
-        id: tag
-        run: echo "tag_name=build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          path: dist/
 
       - name: Create and push tag
         env:
@@ -52,3 +62,20 @@ jobs:
             git tag "$TAG_NAME"
             git push origin "$TAG_NAME"
           fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: Release ${{ steps.tag.outputs.tag_name }}
+          files: |
+            dist/opkg-linux-x86_64
+            dist/opkg-linux-arm32
+            dist/opkg-linux-arm64
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          allow_updates: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

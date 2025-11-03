@@ -21,6 +21,24 @@ operations.
 $ go build ./...
 ```
 
+## Packaging
+
+To build a distributable binary that can be installed system-wide or shipped in a
+package repository, run the command below. It produces the `opkg` executable in
+the `dist/` directory, which you can then integrate into your packaging tooling
+of choice (for example, creating a `.deb`, `.rpm`, or `opkg` package).
+
+```bash
+$ go build -o dist/opkg ./cmd/opkg
+```
+
+If you prefer to install the binary directly into your Go toolchain's `GOBIN`
+directory, use `go install`:
+
+```bash
+$ go install ./cmd/opkg
+```
+
 ## Usage
 
 ```bash

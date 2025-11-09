@@ -6,6 +6,8 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/oe-mirrors/opkg_go/internal/logging"
 )
 
 // Paragraph represents a set of key/value pairs from a Debian control file.
@@ -38,6 +40,8 @@ func ParseControl(r io.Reader) (*ControlFile, error) {
 
 	var current Paragraph
 	var file ControlFile
+
+	logging.Debugf("format: begin parsing control data")
 
 	flush := func() {
 		if len(current.Fields) == 0 {
@@ -81,6 +85,7 @@ func ParseControl(r io.Reader) (*ControlFile, error) {
 		return nil, err
 	}
 	flush()
+	logging.Debugf("format: parsed %d paragraphs", len(file.Paragraphs))
 	return &file, nil
 }
 

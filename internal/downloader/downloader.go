@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/oe-mirrors/opkg_go/internal/logging"
 )
 
 // Client wraps an http.Client to provide convenient helpers for downloading
@@ -35,6 +37,7 @@ func (c *Client) GetBytes(ctx context.Context, url string) ([]byte, error) {
 	if c == nil {
 		return nil, fmt.Errorf("nil downloader client")
 	}
+	logging.Debugf("downloader: fetching %s", url)
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -51,12 +54,17 @@ func (c *Client) GetBytes(ctx context.Context, url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status %s for %s", resp.Status, url)
 	}
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err == nil {
+		logging.Debugf("downloader: received %d bytes from %s", len(body), url)
+	}
+	return body, err
 }
 
 // DownloadToFile downloads the content from url and writes it to the provided
 // path, creating parent directories as necessary.
 func (c *Client) DownloadToFile(ctx context.Context, url, path string) error {
+	logging.Debugf("downloader: downloading %s to %s", url, path)
 	data, err := c.GetBytes(ctx, url)
 	if err != nil {
 		return err
@@ -71,5 +79,6 @@ func (c *Client) DownloadToFile(ctx context.Context, url, path string) error {
 	if err := os.Rename(tmp, path); err != nil {
 		return fmt.Errorf("commit download: %w", err)
 	}
+	logging.Debugf("downloader: download completed for %s", path)
 	return nil
 }

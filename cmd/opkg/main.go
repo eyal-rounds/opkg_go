@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/oe-mirrors/opkg_go/internal/logging"
 	"github.com/oe-mirrors/opkg_go/internal/pkgmgr"
 )
 
@@ -36,6 +37,8 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+
+	logging.Debugf("main: command %s invoked with %d args", args[0], len(args)-1)
 
 	ctx := context.Background()
 
@@ -121,6 +124,7 @@ func printVersion() {
 	if ts == "" {
 		ts = time.Now().UTC().Format(time.RFC3339)
 	}
+	logging.Debugf("main: printing version %s built at %s", version, ts)
 	fmt.Printf("opkg-go %s (%s)\n", version, ts)
 }
 

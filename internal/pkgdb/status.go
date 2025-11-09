@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/oe-mirrors/opkg_go/internal/format"
+	"github.com/oe-mirrors/opkg_go/internal/logging"
 )
 
 // Entry represents a package stored in the status database.
@@ -31,6 +32,7 @@ type Status struct {
 
 // Load reads the status database from disk.
 func Load(path string) (*Status, error) {
+	logging.Debugf("pkgdb: loading status file %s", path)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read status: %w", err)
@@ -53,6 +55,7 @@ func Load(path string) (*Status, error) {
 			Raw:          paragraph,
 		}
 	}
+	logging.Debugf("pkgdb: loaded %d entries", len(status.byName))
 	return status, nil
 }
 
@@ -69,8 +72,10 @@ func (s *Status) Installed(name string) bool {
 	defer s.mu.RUnlock()
 	entry, ok := s.byName[name]
 	if !ok {
+		logging.Debugf("pkgdb: package %s not installed", name)
 		return false
 	}
+	logging.Debugf("pkgdb: package %s has status %s", name, entry.Status)
 	return strings.Contains(entry.Status, "installed")
 }
 
@@ -102,7 +107,9 @@ func (s *Status) Lookup(name string) (Entry, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if entry, ok := s.byName[name]; ok {
+		logging.Debugf("pkgdb: lookup hit for %s", name)
 		return entry, nil
 	}
+	logging.Debugf("pkgdb: lookup miss for %s", name)
 	return Entry{}, ErrNotFound
 }

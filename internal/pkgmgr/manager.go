@@ -19,11 +19,12 @@ import (
 // Manager coordinates package operations by wiring configuration, repository
 // metadata and the status database together.
 type Manager struct {
-	cfg     *config.Config
-	client  *downloader.Client
-	status  *pkgdb.Status
-	indexes repo.IndexSet
-	cache   string
+	cfg           *config.Config
+	client        *downloader.Client
+	status        *pkgdb.Status
+	indexes       repo.IndexSet
+	cache         string
+	indexesLoaded bool
 }
 
 // New creates a package manager using the provided configuration file.
@@ -72,6 +73,7 @@ func (m *Manager) Update(ctx context.Context) error {
 		return err
 	}
 	m.indexes = repo.NewIndexSet(indexes)
+	m.indexesLoaded = true
 	logging.Debugf("pkgmgr: index set contains %d feeds", len(indexes))
 	return nil
 }
@@ -119,6 +121,9 @@ func (m *Manager) Info(name string) (string, error) {
 // caller or external tooling.
 func (m *Manager) Install(ctx context.Context, name string) (string, error) {
 	logging.Debugf("pkgmgr: installing %s", name)
+	if err := m.ensureIndexesLoaded(); err != nil {
+		return "", err
+	}
 	pkg, ok := m.indexes.Find(name)
 	if !ok {
 		return "", fmt.Errorf("package %s not available", name)

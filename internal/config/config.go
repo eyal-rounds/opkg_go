@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/oe-mirrors/opkg_go/internal/logging"
 )
 
 // Feed represents a remote package feed declared in opkg.conf using the
@@ -48,6 +50,8 @@ func Load(path string) (*Config, error) {
 			return nil
 		}
 		visited[p] = true
+
+		logging.Debugf("config: loading file %s", p)
 
 		file, err := os.Open(p)
 		if err != nil {
@@ -93,14 +97,17 @@ func Load(path string) (*Config, error) {
 				}
 				pattern := tokens[1]
 				cfg.Includes = append(cfg.Includes, pattern)
+				logging.Debugf("config: discovered include %s from %s", pattern, p)
 				matches, err := filepath.Glob(pattern)
 				if err != nil {
 					return fmt.Errorf("%s:%d: invalid glob: %w", p, lineNo, err)
 				}
 				if len(matches) == 0 {
+					logging.Debugf("config: include pattern %s from %s matched no files", pattern, p)
 					continue
 				}
 				for _, match := range matches {
+					logging.Debugf("config: including %s", match)
 					if err := load(match); err != nil {
 						return err
 					}
@@ -130,6 +137,8 @@ func Load(path string) (*Config, error) {
 	if err := load(path); err != nil {
 		return nil, err
 	}
+
+	logging.Debugf("config: loaded %d options, %d feeds, %d destinations", len(cfg.Options), len(cfg.Feeds), len(cfg.Destinations))
 
 	return cfg, nil
 }
@@ -231,5 +240,6 @@ func EnsureCacheDir(cfg *Config) (string, error) {
 	if err := os.MkdirAll(cache, fs.ModePerm); err != nil {
 		return "", fmt.Errorf("create cache dir: %w", err)
 	}
+	logging.Debugf("config: ensured cache directory %s", cache)
 	return cache, nil
 }

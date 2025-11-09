@@ -16,6 +16,7 @@ import (
 	"github.com/oe-mirrors/opkg_go/internal/config"
 	"github.com/oe-mirrors/opkg_go/internal/downloader"
 	"github.com/oe-mirrors/opkg_go/internal/format"
+	"github.com/oe-mirrors/opkg_go/internal/logging"
 )
 
 // Package captures the metadata required to perform dependency resolution and
@@ -48,6 +49,8 @@ func Update(ctx context.Context, cfg *config.Config, cacheDir string, client *do
 		return nil, errors.New("downloader required")
 	}
 
+	logging.Debugf("repo: updating %d feeds", len(cfg.Feeds))
+
 	var (
 		wg       sync.WaitGroup
 		mu       sync.Mutex
@@ -60,15 +63,18 @@ func Update(ctx context.Context, cfg *config.Config, cacheDir string, client *do
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			logging.Debugf("repo: fetching feed %s", feed.Name)
 			idx, err := fetchFeed(ctx, feed, cacheDir, client)
 			if err != nil {
 				mu.Lock()
 				if firstErr == nil {
 					firstErr = err
+					logging.Debugf("repo: feed %s failed: %v", feed.Name, err)
 				}
 				mu.Unlock()
 				return
 			}
+			logging.Debugf("repo: feed %s loaded with %d packages", feed.Name, len(idx.Packages))
 			mu.Lock()
 			result = append(result, *idx)
 			mu.Unlock()
@@ -91,6 +97,7 @@ func fetchFeed(ctx context.Context, feed config.Feed, cacheDir string, client *d
 	var data []byte
 	var err error
 	for _, url := range urls {
+		logging.Debugf("repo: attempting %s", url)
 		data, err = client.GetBytes(ctx, url)
 		if err == nil {
 			break
@@ -117,6 +124,8 @@ func fetchFeed(ctx context.Context, feed config.Feed, cacheDir string, client *d
 	if err != nil {
 		return nil, fmt.Errorf("parse feed %s: %w", feed.Name, err)
 	}
+
+	logging.Debugf("repo: parsing feed %s", feed.Name)
 
 	index := Index{
 		Feed:     feed,
@@ -146,6 +155,7 @@ func fetchFeed(ctx context.Context, feed config.Feed, cacheDir string, client *d
 		if err := osWriteFile(path, data, 0o644); err != nil {
 			return nil, fmt.Errorf("cache feed %s: %w", feed.Name, err)
 		}
+		logging.Debugf("repo: cached feed %s at %s", feed.Name, path)
 	}
 
 	return &index, nil

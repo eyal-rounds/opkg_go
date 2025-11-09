@@ -11,6 +11,7 @@ import (
 	"github.com/oe-mirrors/opkg_go/internal/config"
 	"github.com/oe-mirrors/opkg_go/internal/downloader"
 	"github.com/oe-mirrors/opkg_go/internal/format"
+	"github.com/oe-mirrors/opkg_go/internal/logging"
 	"github.com/oe-mirrors/opkg_go/internal/pkgdb"
 	"github.com/oe-mirrors/opkg_go/internal/repo"
 )
@@ -31,19 +32,23 @@ func New(cfgPath string) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
+	logging.Debugf("pkgmgr: configuration loaded from %s", cfgPath)
 	cache, err := config.EnsureCacheDir(cfg)
 	if err != nil {
 		return nil, err
 	}
+	logging.Debugf("pkgmgr: cache directory set to %s", cache)
 	statusPath, err := cfg.StatusPath()
 	var status *pkgdb.Status
 	if err != nil {
+		logging.Debugf("pkgmgr: status path unavailable, using empty database: %v", err)
 		status = pkgdb.Empty()
 	} else {
 		status, err = pkgdb.Load(statusPath)
 		if err != nil {
 			// When the status file is missing we continue with an empty DB.
 			if errors.Is(err, os.ErrNotExist) {
+				logging.Debugf("pkgmgr: status file %s missing, using empty database", statusPath)
 				status = pkgdb.Empty()
 			} else {
 				return nil, err
@@ -61,11 +66,13 @@ func New(cfgPath string) (*Manager, error) {
 
 // Update refreshes the remote package metadata.
 func (m *Manager) Update(ctx context.Context) error {
+	logging.Debugf("pkgmgr: updating package metadata")
 	indexes, err := repo.Update(ctx, m.cfg, m.cache, m.client)
 	if err != nil {
 		return err
 	}
 	m.indexes = repo.NewIndexSet(indexes)
+	logging.Debugf("pkgmgr: index set contains %d feeds", len(indexes))
 	return nil
 }
 
@@ -73,6 +80,7 @@ func (m *Manager) Update(ctx context.Context) error {
 // repositories. When installedOnly is true only packages present in the status
 // database are returned.
 func (m *Manager) List(installedOnly bool) []string {
+	logging.Debugf("pkgmgr: listing packages installedOnly=%t", installedOnly)
 	var lines []string
 	if installedOnly {
 		for _, entry := range m.status.Entries() {
@@ -94,6 +102,7 @@ func (m *Manager) List(installedOnly bool) []string {
 
 // Info returns detailed information about the provided package name.
 func (m *Manager) Info(name string) (string, error) {
+	logging.Debugf("pkgmgr: retrieving info for %s", name)
 	pkg, ok := m.indexes.Find(name)
 	if !ok {
 		if entry, err := m.status.Lookup(name); err == nil {
@@ -109,6 +118,7 @@ func (m *Manager) Info(name string) (string, error) {
 // focuses on downloading the package and leaving further processing to the
 // caller or external tooling.
 func (m *Manager) Install(ctx context.Context, name string) (string, error) {
+	logging.Debugf("pkgmgr: installing %s", name)
 	pkg, ok := m.indexes.Find(name)
 	if !ok {
 		return "", fmt.Errorf("package %s not available", name)
@@ -121,6 +131,7 @@ func (m *Manager) Install(ctx context.Context, name string) (string, error) {
 	if err := m.client.DownloadToFile(ctx, url, dest); err != nil {
 		return "", err
 	}
+	logging.Debugf("pkgmgr: package %s downloaded to %s", name, dest)
 	return dest, nil
 }
 

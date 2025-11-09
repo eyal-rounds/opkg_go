@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/oe-mirrors/opkg_go/internal/logging"
@@ -31,10 +32,19 @@ type Destination struct {
 // forgiving so that we can operate on existing configuration files without
 // supporting every historical knob.
 type Config struct {
-	Options      map[string]string
-	Feeds        []Feed
-	Destinations []Destination
-	Includes     []string
+	Options       map[string]string
+	Feeds         []Feed
+	Destinations  []Destination
+	Includes      []string
+	Architectures []Architecture
+}
+
+// Architecture represents an architecture entry declared with the "arch"
+// directive in opkg.conf. The priority value follows the semantics of the
+// original implementation where lower numbers indicate higher preference.
+type Architecture struct {
+	Name     string
+	Priority int
 }
 
 // Load parses the provided configuration file and all includes referenced by
@@ -91,6 +101,19 @@ func Load(path string) (*Config, error) {
 					return fmt.Errorf("%s:%d: %s expects name and URI", p, lineNo, tokens[0])
 				}
 				cfg.Feeds = append(cfg.Feeds, Feed{Name: tokens[1], URI: tokens[2], Type: tokens[0]})
+			case "arch":
+				if len(tokens) < 2 {
+					return fmt.Errorf("%s:%d: arch expects name and optional priority", p, lineNo)
+				}
+				arch := Architecture{Name: tokens[1]}
+				if len(tokens) >= 3 {
+					prio, err := strconv.Atoi(tokens[2])
+					if err != nil {
+						return fmt.Errorf("%s:%d: invalid architecture priority %q", p, lineNo, tokens[2])
+					}
+					arch.Priority = prio
+				}
+				cfg.Architectures = append(cfg.Architectures, arch)
 			case "include":
 				if len(tokens) < 2 {
 					return fmt.Errorf("%s:%d: include expects a glob", p, lineNo)
@@ -138,7 +161,10 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 
-	logging.Debugf("config: loaded %d options, %d feeds, %d destinations", len(cfg.Options), len(cfg.Feeds), len(cfg.Destinations))
+	logging.Debugf(
+		"config: loaded %d options, %d feeds, %d destinations, %d architectures",
+		len(cfg.Options), len(cfg.Feeds), len(cfg.Destinations), len(cfg.Architectures),
+	)
 
 	return cfg, nil
 }

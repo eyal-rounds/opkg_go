@@ -4,6 +4,13 @@ This repository provides a Go implementation of the `opkg` package manager. The
 rewrite focuses on compatibility with existing configuration files while taking
 advantage of Go's standard library for networking, concurrency and filesystem
 operations.
+The repository was developed solkmnly by using openat codex and i did not write a single linne of code.
+for now it seems to have issues:
+1. on a working system it can't find the right config files, list no installed packages while there are.
+2. doesn't contain all commands.
+
+The idea behing this is to create a single , more powerfull, opkg that doesn't use curl and depends on it
+and it's libraries and will allow to work with non http\s secure storages such as S3 (like apt allows).
 
 ## Features
 

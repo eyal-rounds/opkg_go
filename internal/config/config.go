@@ -121,12 +121,18 @@ func Load(path string) (*Config, error) {
 				pattern := tokens[1]
 				cfg.Includes = append(cfg.Includes, pattern)
 				logging.Debugf("config: discovered include %s from %s", pattern, p)
-				matches, err := filepath.Glob(pattern)
+
+				resolved := pattern
+				if !filepath.IsAbs(resolved) {
+					resolved = filepath.Join(filepath.Dir(p), resolved)
+				}
+
+				matches, err := filepath.Glob(resolved)
 				if err != nil {
 					return fmt.Errorf("%s:%d: invalid glob: %w", p, lineNo, err)
 				}
 				if len(matches) == 0 {
-					logging.Debugf("config: include pattern %s from %s matched no files", pattern, p)
+					logging.Debugf("config: include pattern %s from %s matched no files", resolved, p)
 					continue
 				}
 				for _, match := range matches {
@@ -186,8 +192,14 @@ func (c *Config) StatusPath() (string, error) {
 	if c == nil {
 		return "", errors.New("nil config")
 	}
+	if path := c.FindOption("status_file", ""); path != "" {
+		return path, nil
+	}
 	if path := c.FindOption("status", ""); path != "" {
 		return path, nil
+	}
+	if dir := c.FindOption("status_dir", ""); dir != "" {
+		return filepath.Join(dir, "status"), nil
 	}
 	for _, dest := range c.Destinations {
 		if dest.Name == "root" {
